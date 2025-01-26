@@ -1,29 +1,37 @@
 import json
-import json
+from xml.etree.ElementTree import XMLParser
 
 from django.http import JsonResponse
 from django.shortcuts import render
 from rest_framework.exceptions import ValidationError
+from rest_framework.generics import GenericAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
+from rest_framework.parsers import JSONParser
+from rest_framework.renderers import JSONRenderer
+from rest_framework.response import Response
+from rest_framework.views import APIView
+from rest_framework.mixins import ListModelMixin, CreateModelMixin, RetrieveModelMixin, UpdateModelMixin, DestroyModelMixin
+from django.http import HttpResponse
+from openpyxl import load_workbook
 
 from users.models import User
-from .serializators import UserSerializer, NewSerializer
+from users.serializators import UserSerializer, NewSerializer
 
 def users(request):
     if request.method == 'GET':
         users_rows = User.objects.all()
-        users_data = users_rows.values('id', 'name', 'email', 'age', 'created_at', 'updated_at', 'phone')
+        users_data = users_rows.values('id', 'name', 'email', 'age', 'created_at', 'updated_at')
         return JsonResponse(list(users_data), safe=False)
 
     elif request.method == 'POST':
-        data = json.loads(request.body)
-        print(request.body)
+        if request.headers['content-type'] != 'application/json':
+            data = json.loads(request.body)
+        elif request.headers['content-type'] == 'text/plain':
+            print(request.body)
 
         errors = {}
 
         if not isinstance(data['age'], int):
             errors['age'] = 'Возраст должен быть целым числом'
-        if data.get('phone') is None:
-            errors['phone'] = 'Телефон обязателен'
 
         if errors:
             raise JsonResponse(errors, status=400)
@@ -32,18 +40,21 @@ def users(request):
             name=data['name'],
             email=data['email'],
             age=data['age'],
-            phone=data['phone'],
         )
-        return JsonResponse(
-            {
+
+        response_data = {
                 'id': user.id,
                 'name': user.name,
                 'email': user.email,
                 'age': user.age,
                 'created_at': user.created_at,
                 'updated_at': user.updated_at,
-                'phone': user.phone,
-            },
+            }
+
+        json_response_data = json.dumps(response_data)
+
+        return HttpResponse(json_response_data
+            ,
             status=201,
         )
 
@@ -52,13 +63,48 @@ def users2(request):
     if request.method == 'GET':
         users_rows = User.objects.all()
         serializer = UserSerializer(users_rows, many=True)
-        return JsonResponse(serializer.data, safe=False)
+        return Response(serializer.data, safe=False)
     elif request.method == 'POST':
         serializer = UserSerializer(data=json.loads(request.body))
         if serializer.is_valid():
             serializer.save()
             return JsonResponse(serializer.data, status=201)
         return JsonResponse(serializer.errors, status=400)
+
+
+class User3(APIView):
+
+    parser_classes = [JSONParser]
+    renderer_classes = [JSONRenderer]
+
+    def get(self, request):
+        users_rows = User.objects.all()
+        serializer = UserSerializer(users_rows, many=True)
+        return JsonResponse(serializer.data, safe=False)
+
+    def post(self, request):
+        serializer = UserSerializer(data=request.data)
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse(serializer.data, status=201)
+        return JsonResponse(serializer.errors, status=400)
+
+
+class User4(GenericAPIView, ListModelMixin, CreateModelMixin):
+    queryset = User.objects.all()
+    serializer_class = UserSerializer
+
+    def get(self, request):
+        return self.list(request)
+
+    def post(self, request):
+        return self.create(request)
+
+class User5(ListCreateAPIView):
+    queryset = User.objects.filter(is_active=True)
+    serializer_class = UserSerializer
+
+
 
 
 def user_detail(request, id):
@@ -76,7 +122,6 @@ def user_detail(request, id):
                 'age': user.age,
                 'created_at': user.created_at,
                 'updated_at': user.updated_at,
-                'phone': user.phone
             },
             status=200,
         )
@@ -119,6 +164,54 @@ def user_detail2(request, id):
     elif request.method == 'DELETE':
         user.delete()
         return JsonResponse({}, status=204)
+
+
+class UserDetail3(APIView):
+    def get(self, request, id):
+        try:
+            user = User.objects.get(id=id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        serializer = UserSerializer(user)
+        return JsonResponse(serializer.data)
+
+    def put(self, request, id):
+        try:
+            user = User.objects.get(id=id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        serializer = UserSerializer(user, data=json.loads(request.body))
+        if serializer.is_valid():
+            serializer.save()
+            return JsonResponse(serializer.data)
+        return JsonResponse(serializer.errors, status=400)
+
+    def delete(self, request, id):
+        try:
+            user = User.objects.get(id=id)
+        except User.DoesNotExist:
+            return JsonResponse({'error': 'User not found'}, status=404)
+
+        user.delete()
+        return JsonResponse({}, status=204)
+
+
+
+class UserDetail5(RetrieveUpdateDestroyAPIView):
+    queryset = User.objects.filter(is_active=True)
+    serializer_class = UserSerializer
+
+    def destroy(self, request, *args, **kwargs):
+        instance = self.get_object()
+        instance.is_active = False
+        instance.save()
+        return Response(status=204)
+
+
+
+
 
 
 def user_test(request):

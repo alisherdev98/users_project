@@ -44,8 +44,14 @@ INSTALLED_APPS = [
 ]
 
 REST_FRAMEWORK = {
-    'DEFAULT_PAGINATION_CLASS': 'rest_framework.pagination.PageNumberPagination',
-    'PAGE_SIZE': 10
+    'DEFAULT_PARSER_CLASSES': [
+        'rest_framework.parsers.JSONParser',        # Обработка JSON
+        'rest_framework.parsers.FormParser',        # Обработка HTML-форм
+        'rest_framework.parsers.MultiPartParser',   # Обработка форм с файлами
+    ],
+    'DEFAULT_RENDERER_CLASSES': [
+        'rest_framework.renderers.JSONRenderer',    # JSON
+    ]
 }
 
 MIDDLEWARE = [

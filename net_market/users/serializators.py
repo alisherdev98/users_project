@@ -18,6 +18,9 @@ class UserSerializer(serializers.ModelSerializer):
 class NewSerializer(serializers.Serializer):
     login = serializers.CharField()
     email_str = serializers.EmailField()
-    age = serializers.CharField()
+    age = serializers.IntegerField()
 
+class AuthSerializer(serializers.Serializer):
+    login = serializers.CharField()
+    password = serializers.CharField()
 
