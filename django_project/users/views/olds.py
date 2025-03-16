@@ -6,6 +6,8 @@ from django.shortcuts import render
 from rest_framework.exceptions import ValidationError
 from rest_framework.generics import GenericAPIView, ListCreateAPIView, RetrieveUpdateDestroyAPIView
 from rest_framework.parsers import JSONParser
+from rest_framework.permissions import IsAuthenticated, BasePermission
+from rest_framework_simplejwt.authentication import JWTAuthentication
 from rest_framework_xml.parsers import XMLParser
 from rest_framework_xml.renderers import XMLRenderer
 from rest_framework.renderers import JSONRenderer
@@ -18,7 +20,34 @@ from openpyxl import load_workbook
 from users.models import User
 from users.serializators import UserSerializer, NewSerializer
 
+from django.contrib.auth import authenticate, login, logout
+from django.contrib.auth.decorators import login_required
 
+class IsActiveUsers(BasePermission):
+    def has_permission(self, request, view):
+        return request.user.is_active
+
+
+
+def auth(request):
+    username = request.POST.get('username')
+    password = request.POST.get('password')
+
+    from rest_framework.authtoken.models import Token
+    from django.contrib.auth.models import User
+
+    user = User.objects.get(username=username)  # Находим пользователя
+    token, created = Token.objects.get_or_create(user=user)  # Создаём токен
+    print(token.key)  # Выводим токен
+
+    user = authenticate(username=username, password=password)
+    if user is not None:
+        login(request, user)  # Устанавливает сессию
+    return HttpResponse()
+
+def logout_view(request):
+    logout(request)
+    return HttpResponse()
 
 
 class User2222:
@@ -76,11 +105,16 @@ class User2222:
         elif request.method == 'POST':
             self.post(request)
 
+# @login_required
 def users2(request):
+
+    # if not request.user.is_authenticated:
+    #     return HttpResponse('Unauthorized', status=401)
+
     if request.method == 'GET':
         users_rows = User.objects.all()
         serializer = UserSerializer(users_rows, many=True)
-        return Response(serializer.data, safe=False)
+        return JsonResponse(serializer.data, safe=False)
     elif request.method == 'POST':
         serializer = UserSerializer(data=json.loads(request.body))
         if serializer.is_valid():
@@ -90,9 +124,11 @@ def users2(request):
 
 
 class User3(APIView):
-
+    authentication_classes = [JWTAuthentication]
+    permission_classes = [IsAuthenticated, IsActiveUsers]
     parser_classes = [JSONParser, XMLParser]
     renderer_classes = [JSONRenderer, XMLRenderer]
+
 
     def get(self, request):
         users_rows = User.objects.all()

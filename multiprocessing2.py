@@ -4,7 +4,10 @@ import threading
 
 EMPLOYEES = ["Иван", "Петр", "Сергей",]
 
-def calculate_zp(employee, last_name_employee):
+threading_results = []
+multiprocessing_results = []
+
+def calculate_zp(employee, last_name_employee, queue=None):
     print(f"{employee} - {last_name_employee}: \n -------------")
     time.sleep(2)
 
@@ -16,7 +19,15 @@ def calculate_zp(employee, last_name_employee):
 
     print('Расчитать часы')
     print("Расчитать налоги")
+
+    #для многопоточности
+    threading_results.append(employee)
+
+    #для многопроцессорности
+    if queue:
+        queue.put(employee)
     return employee
+
 
 
 def main():
@@ -25,9 +36,12 @@ def main():
 
 def main_with_multiprocessing():
     processes = []
+
+    result_queue = multiprocessing.Queue()
+
     for employee in EMPLOYEES:
         processes.append(
-            multiprocessing.Process(target=calculate_zp, args=(employee, "Фамилия"))
+            multiprocessing.Process(target=calculate_zp, args=(employee, "Фамилия", result_queue))
         )
 
     for process in processes:
@@ -36,6 +50,11 @@ def main_with_multiprocessing():
 
     for process in processes:
         process.join()
+
+    while not result_queue.empty():
+        multiprocessing_results.append(result_queue.get())
+
+    print(multiprocessing_results)
 
 
 def main_with_threading():
@@ -57,6 +76,8 @@ if __name__ == '__main__':
     # main()
     # main_with_multiprocessing()
     main_with_threading()
+
+    print(threading_results)
 
 
     print(f"Время выполнения: {time.time() - start_time}")
